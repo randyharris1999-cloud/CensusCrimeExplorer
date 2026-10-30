@@ -2,7 +2,7 @@
 
 Explore the 2021 Census and Guelph Police calls for service (2021–2025) across Guelph's 201 neighbourhoods (Statistics Canada dissemination areas), and what crime nearby means for an area's wellbeing.
 
-Built from [Guelph Census Explorer](../GuelphCensusExplorer) with a new **Crime and safety** measure group:
+Built from Guelph Census Explorer with a new **Crime and safety** measure group:
 
 - **Seven crime measures** that map, rank, compare and relate like any census measure: a 0–100 crime pressure index, all incident calls nearby, and five groups (violence and threats; break-ins and vehicle theft; theft and vandalism; disturbances and disorder; collisions and driving complaints). Figures are police incident calls a year on the streets within a 5-minute walk (400 m) of each home, averaged over the homes in a neighbourhood.
 - **Crime and wellbeing summary** at the top of every neighbourhood profile: a plain-language description, the most common call types, the 2021–2025 trend, and a note on how each high-ranking type affects wellbeing. Search an address and the summary switches to that exact address.
@@ -25,7 +25,7 @@ Built from [Guelph Census Explorer](../GuelphCensusExplorer) with a new **Crime 
 
 Phones and narrow windows (760 px or less) that open `index.html` are sent to `mobile.html` automatically. Each page links to the other, and a visitor who switches to desktop on a phone stays there.
 
-A companion to [Guelph Census Explorer](../GuelphCensusExplorer) and [15-Minute Guelph](https://github.com/randyharris1999-cloud/15-Minute-Guelph). It includes that app's 15-minute score for each neighbourhood.
+A companion to Guelph Census Explorer and [15-Minute Guelph](https://github.com/randyharris1999-cloud/15-Minute-Guelph). It includes that app's 15-minute score for each neighbourhood.
 
 ## What's in the folder
 
