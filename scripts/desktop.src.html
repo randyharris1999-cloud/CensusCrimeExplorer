@@ -1,0 +1,266 @@
+<title>Census and Crime Explorer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<script>
+// Phones get the mobile version unless the visitor chose the desktop one.
+(function () { var pref = null; try { pref = localStorage.getItem("gce-view"); } catch (e) {}
+  if (pref !== "desktop" && window.matchMedia && matchMedia("(max-width: 760px)").matches) location.replace("mobile.html" + location.hash); })();
+</script>
+<meta name="description" content="Explore the 2021 Census across Guelph's 201 neighbourhoods: map any measure, compare two neighbourhoods and see how measures relate.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>/*LEAFLET_CSS*/
+.crime{border:1px solid var(--rule);border-radius:10px;padding:12px;display:grid;gap:10px;background:var(--panel)}
+.crime h3{margin:0;font-family:var(--f-display);font-size:18px;font-weight:600;letter-spacing:.01em}
+.crime h3 em{font-style:normal;font-family:var(--f-mono);font-size:11px;color:var(--muted);font-weight:400;margin-left:6px;letter-spacing:0}
+.chead{display:grid;grid-template-columns:62px minmax(0,1fr);gap:12px;align-items:start}
+.chead p{margin:0;font-size:13.5px;line-height:1.5;text-wrap:pretty}
+.cidx{display:grid;justify-items:center;gap:3px;padding:8px 4px;border-radius:8px;background:var(--chip)}
+.cidx b{font-family:var(--f-display);font-size:30px;font-weight:600;line-height:1}
+.cidx small{font-size:9px;text-align:center;color:var(--muted);line-height:1.25;text-transform:uppercase;letter-spacing:.05em}
+.cnotes p{margin:0 0 6px;font-size:13px;line-height:1.5;padding-left:10px;border-left:3px solid var(--crime);text-wrap:pretty}
+.cnotes p:last-child{margin-bottom:0}
+.cbars{display:grid}
+.cbh,.cbar{display:grid;grid-template-columns:minmax(0,1fr) 92px 50px;gap:8px;align-items:center}
+.cbh{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;padding-bottom:3px}
+.cbh span:last-child,.cbar b{text-align:right}
+.cbar{border:0;background:none;padding:5px 2px;border-top:1px solid var(--rule);font:inherit;font-size:12.5px;color:inherit;cursor:pointer;text-align:left;width:100%}
+.cbar:hover{background:var(--chip)}
+.cbar b{font-family:var(--f-mono);font-size:12px;font-weight:500;font-variant-numeric:tabular-nums}
+.track{position:relative;height:8px;border-radius:4px;background:var(--chip)}
+.track i{position:absolute;left:0;top:0;bottom:0;border-radius:4px}
+.track em{position:absolute;left:50%;top:-2px;bottom:-2px;width:1.5px;background:var(--ink);opacity:.5}
+.cfoot{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:end}
+.spark{display:flex;gap:3px;align-items:flex-end}
+.spark span{display:grid;justify-items:center;gap:2px}
+.spark i{width:12px;background:var(--crime);border-radius:2px 2px 0 0;display:block}
+.spark small{font-size:9px;color:var(--muted);font-family:var(--f-mono)}
+.cnote{margin:0;font-size:11px;color:var(--muted);line-height:1.45}
+</style>
+<style>
+/* Layout: map fills the left, a scrolling analysis column on the right; stacks to map-over-panel on phones.
+   Tokens shared with 15-Minute Guelph so the two apps read as a family. */
+:root{
+  --bg:#F2F3EF; --panel:#FBFBF8; --ink:#1C2A2D; --muted:#5D6A6C; --rule:#DCDFD8; --chip:#ECEEE8;
+  --crime:#C8452D; --accent:#00A6E5; --accent-ink:#06303F; --accent-text:#0079A8; --brand-green:#85B24A; --warn:#B4532A;
+  --land:#E9EBE4; --water:#9FC6D6; --water-edge:#7FAFC2; --street:#FFFFFF; --case:#B9BEB4; --hwy:#F4D58D;
+  --nodata:#D6D9D1; --halo:rgba(251,251,248,.94); --sel:#1C2A2D;
+  --bldg:rgba(28,42,45,.17); --bldg-edge:rgba(28,42,45,.32); --label:#3D4A4C;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#101617; --panel:#151C1D; --ink:#E4EBE9; --muted:#97A5A4; --rule:#273133; --chip:#1E2729;
+  --crime:#E2775C; --accent:#00A6E5; --accent-ink:#06232E; --accent-text:#3DC1F0; --brand-green:#85B24A; --warn:#E08A5F;
+  --land:#172022; --water:#1F4E63; --water-edge:#2C6178; --street:#3A4749; --case:#0C1112; --hwy:#6B5A2E;
+  --nodata:#2A3335; --halo:rgba(21,28,29,.94); --sel:#FFFFFF; --bldg:rgba(0,0,0,.34); --bldg-edge:rgba(0,0,0,.55); --label:#C9D3D2; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#101617; --panel:#151C1D; --ink:#E4EBE9; --muted:#97A5A4; --rule:#273133; --chip:#1E2729;
+  --crime:#E2775C; --accent:#00A6E5; --accent-ink:#06232E; --accent-text:#3DC1F0; --brand-green:#85B24A; --warn:#E08A5F;
+  --land:#172022; --water:#1F4E63; --water-edge:#2C6178; --street:#3A4749; --case:#0C1112; --hwy:#6B5A2E;
+  --nodata:#2A3335; --halo:rgba(21,28,29,.94); --sel:#FFFFFF; --bldg:rgba(0,0,0,.34); --bldg-edge:rgba(0,0,0,.55); --label:#C9D3D2; color-scheme:dark }
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45}
+*{box-sizing:border-box}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.app{display:grid;grid-template-columns:minmax(0,1fr) 420px;grid-template-rows:100%;height:100%}
+#map{background:var(--land);min-height:320px}
+.panel{background:var(--panel);border-left:1px solid var(--rule);overflow-y:auto;display:flex;flex-direction:column}
+.panel > *{padding-left:max(18px, env(safe-area-inset-left,0px));padding-right:max(18px, env(safe-area-inset-right,0px))}
+
+header{padding-block:18px 14px;border-bottom:1px solid var(--rule);display:grid;gap:6px}
+.eyebrow{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600;display:flex;justify-content:space-between;gap:12px}
+.eyebrow a{color:var(--accent-text);text-decoration:none;letter-spacing:.04em}
+.eyebrow a:hover{text-decoration:underline}
+h1{font-family:var(--f-display);font-weight:700;font-size:32px;line-height:1;margin:0;text-wrap:balance}
+header p{margin:0;color:var(--muted);font-size:13px}
+
+section{padding-block:16px;border-bottom:1px solid var(--rule);display:grid;gap:10px}
+h2{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:0;font-weight:600;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+h2 em{font-style:normal;text-transform:none;letter-spacing:0;font-family:var(--f-mono);font-weight:400}
+
+label.field{display:grid;gap:4px;font-size:12px;color:var(--muted);font-weight:500}
+select,input[type=search]{width:100%;padding:9px 10px;border:1px solid var(--rule);border-radius:8px;background:var(--bg);font-size:14px;color:var(--ink)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.seg{display:flex;border:1px solid var(--rule);border-radius:8px;overflow:hidden}
+.seg button{flex:1;border:0;background:var(--bg);padding:7px 4px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer}
+.seg button + button{border-left:1px solid var(--rule)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+
+.measureHead{display:grid;gap:2px}
+.measureHead b{font-family:var(--f-display);font-size:24px;font-weight:600;line-height:1.05}
+.measureHead small{color:var(--muted);font-size:12px}
+.cityfig{display:flex;gap:18px;flex-wrap:wrap}
+.cityfig div{display:grid}
+.cityfig small{font-size:11px;color:var(--muted)}
+.cityfig b{font-family:var(--f-mono);font-weight:500;font-size:15px;font-variant-numeric:tabular-nums}
+
+.legend{display:grid;gap:2px}
+.legend button{display:grid;grid-template-columns:14px minmax(0,1fr) 92px 28px;gap:10px;align-items:center;padding:5px 4px;border:0;border-radius:6px;background:none;text-align:left;cursor:pointer;font-size:12px}
+.legend button:hover,.legend button[aria-pressed="true"]{background:var(--chip)}
+.legend i{width:14px;height:14px;border-radius:3px;display:block;border:1px solid color-mix(in srgb,var(--ink) 12%,transparent)}
+.legend .rng{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.legend .bar{height:8px;background:var(--chip);border-radius:2px;overflow:hidden}
+.legend .bar span{display:block;height:100%;background:var(--muted);opacity:.55}
+.legend .n{font-family:var(--f-mono);color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.legend .nd i{background:var(--nodata)}
+.hint{font-size:12px;color:var(--muted);margin:0}
+
+.search{position:relative}
+.sugg{position:absolute;left:0;right:0;top:100%;margin:4px 0 0;padding:4px;list-style:none;background:var(--panel);border:1px solid var(--rule);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);z-index:5;max-height:260px;overflow:auto}
+.sugg li{padding:7px 8px;border-radius:6px;cursor:pointer;display:flex;justify-content:space-between;gap:8px;font-size:13px}
+.sugg li[aria-selected="true"],.sugg li:hover{background:var(--chip)}
+.sugg small{color:var(--muted);font-family:var(--f-mono);font-size:11px;white-space:nowrap}
+.sugg li span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sugg li span em{font-style:normal;color:var(--muted);font-size:12px}
+.addrline{display:flex;gap:8px;align-items:center;font-size:13px}
+.addrline i{width:10px;height:10px;border-radius:50%;background:var(--warn);border:2px solid var(--panel);box-shadow:0 0 0 1px var(--warn);flex:none}
+
+.profile .title{display:grid;gap:2px}
+.profile .title b{font-family:var(--f-display);font-size:22px;font-weight:600;line-height:1.05;text-wrap:balance}
+.profile .title small{color:var(--muted);font-family:var(--f-mono);font-size:11px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--rule);background:var(--bg);border-radius:99px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.ptable{display:grid;gap:0;font-size:13px}
+.ptable .ph,.ptable button{display:grid;grid-template-columns:minmax(0,1fr) 74px 74px;gap:8px;align-items:center;padding:6px 2px;border:0;border-bottom:1px solid var(--rule);background:none;text-align:left;width:100%;cursor:pointer}
+.ptable.cmp .ph,.ptable.cmp button{grid-template-columns:minmax(0,1fr) 66px 66px 58px}
+.ptable .gh{font-family:var(--f-display);font-size:16px;font-weight:600;padding:14px 2px 2px;border-bottom:1px solid var(--rule)}
+.ptable .ph{cursor:default;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;padding-top:0}
+.ptable button:hover{background:var(--chip)}
+.ptable button[aria-current="true"] .lbl{font-weight:700}
+.ptable .lbl{display:grid;gap:3px;min-width:0}
+.ptable .lbl > span:first-child{text-wrap:pretty}
+.ptable .v{font-family:var(--f-mono);font-size:12px;text-align:right;font-variant-numeric:tabular-nums}
+.ptable .v.city{color:var(--muted)}
+.ptable .v.up{color:var(--brand-green)} .ptable .v.dn{color:var(--warn)}
+.strip{position:relative;height:6px;border-radius:3px;background:linear-gradient(90deg,var(--chip),color-mix(in srgb,var(--muted) 35%,var(--chip)))}
+.strip i{position:absolute;top:-2px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:var(--accent);border:2px solid var(--panel)}
+.strip i.b{background:var(--warn)}
+.strip::after{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;border-left:1px dashed var(--muted);opacity:.6}
+.empty{padding:14px;border:1px dashed var(--rule);border-radius:8px;color:var(--muted);font-size:13px}
+.key{display:flex;gap:14px;font-size:11px;color:var(--muted);flex-wrap:wrap}
+.key span{display:inline-flex;gap:6px;align-items:center}
+.key i{width:9px;height:9px;border-radius:50%;display:inline-block}
+
+.scatter svg{width:100%;height:auto;display:block;overflow:visible}
+.scatter .ax{stroke:var(--rule)} .scatter .tick{fill:var(--muted);font:10px var(--f-mono)}
+.scatter .axl{fill:var(--muted);font:600 11px var(--f-body)}
+.scatter circle{stroke:var(--panel);stroke-width:.8;cursor:pointer}
+.scatter circle.sel{stroke:var(--sel);stroke-width:2.2}
+.scatter circle.dim{opacity:.18}
+.insight{margin:0;padding:10px 12px;background:var(--chip);border-radius:8px;font-size:13px}
+
+.ranks{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.ranks h3{margin:0 0 4px;font-size:12px;font-weight:600}
+.ranks ol{margin:0;padding:0;list-style:none;display:grid;gap:2px}
+.ranks button{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;width:100%;border:0;background:none;padding:4px 4px;border-radius:5px;cursor:pointer;text-align:left;font-size:12px}
+.ranks button:hover{background:var(--chip)}
+.ranks button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ranks button b{font-family:var(--f-mono);font-weight:500;font-variant-numeric:tabular-nums}
+
+footer{padding-block:16px 24px;font-size:11px;color:var(--muted);display:grid;gap:6px}
+footer p{margin:0}
+footer a{color:var(--accent-text)}
+
+.leaflet-container{font-family:var(--f-body);background:var(--land)}
+.north{color:var(--ink);background:var(--halo);border:1px solid var(--rule);border-radius:50%;width:44px;height:44px;display:grid;place-items:center;box-shadow:0 1px 6px rgba(0,0,0,.12)}
+.north svg{display:block}
+.leaflet-tooltip.tip{background:var(--halo);color:var(--ink);border:1px solid var(--rule);box-shadow:0 2px 10px rgba(0,0,0,.15);border-radius:6px;padding:6px 8px;font-size:12px;line-height:1.35}
+.leaflet-tooltip.tip:before{display:none}
+.leaflet-tooltip.tip b{font-weight:600}
+.leaflet-tooltip.tip .tv{font-family:var(--f-mono)}
+.leaflet-bar a{background:var(--panel);color:var(--ink);border-bottom-color:var(--rule)}
+.leaflet-bar a:hover{background:var(--chip)}
+.leaflet-touch .leaflet-bar{border-color:var(--rule)}
+.leaflet-container .leaflet-control-attribution{background:var(--halo);color:var(--muted)}
+.leaflet-container .leaflet-control-attribution a{color:var(--accent-text)}
+.loading{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:13px;z-index:1}
+.mapwrap{position:relative;min-width:0}
+.mapwrap #map{position:absolute;inset:0}
+
+@media (max-width: 860px){
+  html,body{height:auto}
+  .app{grid-template-columns:1fr;grid-template-rows:auto;height:auto}
+  .mapwrap{height:56vh;min-height:340px}
+  .panel{border-left:0;border-top:1px solid var(--rule);overflow:visible}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none!important;animation:none!important} }
+</style>
+
+<div class="app">
+  <div class="mapwrap"><div id="map" role="application" aria-label="Map of Guelph neighbourhoods"></div><div class="loading" id="loading">Loading 2021 Census neighbourhoods…</div></div>
+  <aside class="panel">
+    <header>
+      <div class="eyebrow"><span>Guelph · 2021 Census · Police calls 2021–25</span><a href="https://randyharris1999-cloud.github.io/15-Minute-Guelph/" target="_blank" rel="noopener">15-Minute Guelph ↗</a></div>
+      <h1>Census and Crime Explorer</h1>
+      <p id="sub">Guelph's neighbourhoods by the numbers, with crime and what it means for wellbeing.</p>
+    </header>
+
+    <section aria-labelledby="hMap">
+      <h2 id="hMap">Map a measure</h2>
+      <label class="field" for="measure">Measure<select id="measure"></select></label>
+      <div class="row2">
+        <label class="field">Breaks
+          <div class="seg" id="method" role="group" aria-label="Classification method">
+            <button data-m="jenks" aria-pressed="true" title="Natural breaks (Jenks)">Natural</button>
+            <button data-m="quantile" aria-pressed="false">Quantile</button>
+            <button data-m="equal" aria-pressed="false" title="Equal interval">Equal</button>
+          </div>
+        </label>
+        <label class="field">Classes
+          <div class="seg" id="classes" role="group" aria-label="Number of classes">
+            <button data-k="4" aria-pressed="false">4</button><button data-k="5" aria-pressed="true">5</button><button data-k="6" aria-pressed="false">6</button><button data-k="7" aria-pressed="false">7</button>
+          </div>
+        </label>
+      </div>
+      <div class="measureHead"><b id="mLabel"></b><small id="mDesc"></small></div>
+      <div class="cityfig" id="cityfig"></div>
+      <div class="legend" id="legend"></div>
+      <p class="hint">Tap a class to pick out its neighbourhoods. Tap the map for a neighbourhood's full profile.</p>
+    </section>
+
+    <section aria-labelledby="hFind">
+      <h2 id="hFind">Find an address or street <em id="addrNote"></em></h2>
+      <div class="search">
+        <input type="search" id="q" placeholder="e.g. 1 Carden St or Gordon St" autocomplete="off" aria-label="Find a Guelph address or street" role="combobox" aria-expanded="false" aria-controls="sugg">
+        <ul class="sugg" id="sugg" role="listbox" hidden></ul>
+      </div>
+    </section>
+
+    <section aria-labelledby="hProf" class="profile">
+      <h2 id="hProf">Neighbourhood profile <em id="profNote"></em></h2>
+      <div id="profile"></div>
+    </section>
+
+    <section aria-labelledby="hRel" class="scatter">
+      <h2 id="hRel">How two measures relate</h2>
+      <label class="field" for="ymeasure">Compare the mapped measure with<select id="ymeasure"></select></label>
+      <div id="scatter"></div>
+      <p class="insight" id="rnote"></p>
+    </section>
+
+    <section aria-labelledby="hRank">
+      <h2 id="hRank">Highest and lowest <em id="rankNote"></em></h2>
+      <div class="ranks" id="ranks"></div>
+    </section>
+
+    <footer>
+      <p>Neighbourhoods are Statistics Canada dissemination areas (DAs), each home to roughly 400 to 700 people. Each is named after the two streets with the most length inside it. Values marked n/a were suppressed by Statistics Canada to protect privacy.</p>
+      <p>Incomes are for the 2020 calendar year, when pandemic benefits raised some low incomes. City figures are Statistics Canada's own figures for the City of Guelph. Most measures past population and age come from the 25% long-form sample, so small neighbourhoods can swing a lot. Work figures describe May 2021, during the pandemic.</p>
+      <p>Data: Statistics Canada, 2021 Census of Population (Statistics Canada Open Licence). Crime: Guelph Police Service calls for service, 2021–2025. Map, addresses and city boundary: City of Guelph Open Data. The 15-minute score comes from <a href="https://randyharris1999-cloud.github.io/15-Minute-Guelph/" target="_blank" rel="noopener">15-Minute Guelph</a>. An independent project, not an official City of Guelph service. Created by Randy Harris.</p>
+      <p>Crime figures come from Guelph Police Service calls for service, 2021 to 2025 (about 400,000 calls). The app keeps 51,909 calls about place-based incidents in five groups: violence and threats; break-ins and vehicle theft; theft and vandalism; disturbances and disorder; and collisions and driving complaints. It leaves out administrative records, 911 hang-ups, traffic stops and other police-initiated work, wellness and mental-health calls, domestic calls, missing persons, fraud and sex offences, because they are not tied to a place or would be unfair to map. Calls give a street but no house number, so each street's calls are spread along it (half by length, half by the number of addresses on each block). Each home gets the calls a year on streets within 400 m, a 5-minute walk; a neighbourhood's figure is the average of its homes. Vehicle-theft calls logged at Guelph Police headquarters (15 Wyndham St S) are dropped. Calls are not convictions, and long arterial roads blur where along them a call happened.</p><p>Why it matters for wellbeing: crime and the fear of it affect health beyond the harm to victims, discouraging walking and outdoor activity and weakening ties between neighbours (<a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3666893/" target="_blank" rel="noopener">Lorenc et al., 2013</a>; <a href="https://www150.statcan.gc.ca/n1/pub/85-002-x/2011001/article/11577-eng.htm" target="_blank" rel="noopener">Statistics Canada, perceptions of personal safety</a>). Links between crime and census measures in the Relate chart describe places, not people, and do not show that one causes the other.</p>
+      <p><a href="mobile.html" id="toMobile">Switch to the phone version</a></p>
+    </footer>
+  </aside>
+</div>
+
+<script src="leaflet.min.js"></script>
+<script>
+window.UI = { onReady() { const t = document.getElementById("toMobile"); if (t) t.onclick = () => { try { localStorage.removeItem("gce-view"); } catch (e) {} }; } };
+</script>
+<script>/*APP_JS*/</script>

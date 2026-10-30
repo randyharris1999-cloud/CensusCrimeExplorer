@@ -1,0 +1,384 @@
+<title>Census and Crime Explorer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Explore the 2021 Census across Guelph's 201 neighbourhoods on your phone.">
+<meta name="theme-color" content="#FBFBF8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>/*LEAFLET_CSS*/
+.crime{border:1px solid var(--rule);border-radius:10px;padding:12px;display:grid;gap:10px;background:var(--panel)}
+.crime h3{margin:0;font-family:var(--f-display);font-size:18px;font-weight:600;letter-spacing:.01em}
+.crime h3 em{font-style:normal;font-family:var(--f-mono);font-size:11px;color:var(--muted);font-weight:400;margin-left:6px;letter-spacing:0}
+.chead{display:grid;grid-template-columns:62px minmax(0,1fr);gap:12px;align-items:start}
+.chead p{margin:0;font-size:13.5px;line-height:1.5;text-wrap:pretty}
+.cidx{display:grid;justify-items:center;gap:3px;padding:8px 4px;border-radius:8px;background:var(--chip)}
+.cidx b{font-family:var(--f-display);font-size:30px;font-weight:600;line-height:1}
+.cidx small{font-size:9px;text-align:center;color:var(--muted);line-height:1.25;text-transform:uppercase;letter-spacing:.05em}
+.cnotes p{margin:0 0 6px;font-size:13px;line-height:1.5;padding-left:10px;border-left:3px solid var(--crime);text-wrap:pretty}
+.cnotes p:last-child{margin-bottom:0}
+.cbars{display:grid}
+.cbh,.cbar{display:grid;grid-template-columns:minmax(0,1fr) 92px 50px;gap:8px;align-items:center}
+.cbh{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;padding-bottom:3px}
+.cbh span:last-child,.cbar b{text-align:right}
+.cbar{border:0;background:none;padding:5px 2px;border-top:1px solid var(--rule);font:inherit;font-size:12.5px;color:inherit;cursor:pointer;text-align:left;width:100%}
+.cbar:hover{background:var(--chip)}
+.cbar b{font-family:var(--f-mono);font-size:12px;font-weight:500;font-variant-numeric:tabular-nums}
+.track{position:relative;height:8px;border-radius:4px;background:var(--chip)}
+.track i{position:absolute;left:0;top:0;bottom:0;border-radius:4px}
+.track em{position:absolute;left:50%;top:-2px;bottom:-2px;width:1.5px;background:var(--ink);opacity:.5}
+.cfoot{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:end}
+.spark{display:flex;gap:3px;align-items:flex-end}
+.spark span{display:grid;justify-items:center;gap:2px}
+.spark i{width:12px;background:var(--crime);border-radius:2px 2px 0 0;display:block}
+.spark small{font-size:9px;color:var(--muted);font-family:var(--f-mono)}
+.cnote{margin:0;font-size:11px;color:var(--muted);line-height:1.45}
+</style>
+<style>
+/* Layout (phone): the map fills the screen, search floats on top, and a bottom tab bar opens a slide-up sheet.
+   Tokens shared with 15-Minute Guelph and the desktop page. */
+:root{
+  --bg:#F2F3EF; --panel:#FBFBF8; --ink:#1C2A2D; --muted:#5D6A6C; --rule:#DCDFD8; --chip:#ECEEE8;
+  --crime:#C8452D; --accent:#00A6E5; --accent-ink:#06303F; --accent-text:#0079A8; --brand-green:#85B24A; --warn:#B4532A;
+  --land:#E9EBE4; --water:#9FC6D6; --water-edge:#7FAFC2; --street:#FFFFFF; --case:#B9BEB4; --hwy:#F4D58D;
+  --nodata:#D6D9D1; --halo:rgba(251,251,248,.94); --sel:#1C2A2D;
+  --bldg:rgba(28,42,45,.17); --bldg-edge:rgba(28,42,45,.32); --label:#3D4A4C;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#101617; --panel:#151C1D; --ink:#E4EBE9; --muted:#97A5A4; --rule:#273133; --chip:#1E2729;
+  --crime:#E2775C; --accent:#00A6E5; --accent-ink:#06232E; --accent-text:#3DC1F0; --brand-green:#85B24A; --warn:#E08A5F;
+  --land:#172022; --water:#1F4E63; --water-edge:#2C6178; --street:#3A4749; --case:#0C1112; --hwy:#6B5A2E;
+  --nodata:#2A3335; --halo:rgba(21,28,29,.94); --sel:#FFFFFF; --bldg:rgba(0,0,0,.34); --bldg-edge:rgba(0,0,0,.55); --label:#C9D3D2; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#101617; --panel:#151C1D; --ink:#E4EBE9; --muted:#97A5A4; --rule:#273133; --chip:#1E2729;
+  --crime:#E2775C; --accent:#00A6E5; --accent-ink:#06232E; --accent-text:#3DC1F0; --brand-green:#85B24A; --warn:#E08A5F;
+  --land:#172022; --water:#1F4E63; --water-edge:#2C6178; --street:#3A4749; --case:#0C1112; --hwy:#6B5A2E;
+  --nodata:#2A3335; --halo:rgba(21,28,29,.94); --sel:#FFFFFF; --bldg:rgba(0,0,0,.34); --bldg-edge:rgba(0,0,0,.55); --label:#C9D3D2; color-scheme:dark }
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45}
+*{box-sizing:border-box}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.app{display:grid;grid-template-columns:minmax(0,1fr) 420px;grid-template-rows:100%;height:100%}
+#map{background:var(--land);min-height:320px}
+.panel{background:var(--panel);border-left:1px solid var(--rule);overflow-y:auto;display:flex;flex-direction:column}
+.panel > *{padding-left:max(18px, env(safe-area-inset-left,0px));padding-right:max(18px, env(safe-area-inset-right,0px))}
+
+header{padding-block:18px 14px;border-bottom:1px solid var(--rule);display:grid;gap:6px}
+.eyebrow{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600;display:flex;justify-content:space-between;gap:12px}
+.eyebrow a{color:var(--accent-text);text-decoration:none;letter-spacing:.04em}
+.eyebrow a:hover{text-decoration:underline}
+h1{font-family:var(--f-display);font-weight:700;font-size:32px;line-height:1;margin:0;text-wrap:balance}
+header p{margin:0;color:var(--muted);font-size:13px}
+
+section{padding-block:16px;border-bottom:1px solid var(--rule);display:grid;gap:10px}
+h2{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:0;font-weight:600;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+h2 em{font-style:normal;text-transform:none;letter-spacing:0;font-family:var(--f-mono);font-weight:400}
+
+label.field{display:grid;gap:4px;font-size:12px;color:var(--muted);font-weight:500}
+select,input[type=search]{width:100%;padding:9px 10px;border:1px solid var(--rule);border-radius:8px;background:var(--bg);font-size:14px;color:var(--ink)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.seg{display:flex;border:1px solid var(--rule);border-radius:8px;overflow:hidden}
+.seg button{flex:1;border:0;background:var(--bg);padding:7px 4px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer}
+.seg button + button{border-left:1px solid var(--rule)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+
+.measureHead{display:grid;gap:2px}
+.measureHead b{font-family:var(--f-display);font-size:24px;font-weight:600;line-height:1.05}
+.measureHead small{color:var(--muted);font-size:12px}
+.cityfig{display:flex;gap:18px;flex-wrap:wrap}
+.cityfig div{display:grid}
+.cityfig small{font-size:11px;color:var(--muted)}
+.cityfig b{font-family:var(--f-mono);font-weight:500;font-size:15px;font-variant-numeric:tabular-nums}
+
+.legend{display:grid;gap:2px}
+.legend button{display:grid;grid-template-columns:14px minmax(0,1fr) 92px 28px;gap:10px;align-items:center;padding:5px 4px;border:0;border-radius:6px;background:none;text-align:left;cursor:pointer;font-size:12px}
+.legend button:hover,.legend button[aria-pressed="true"]{background:var(--chip)}
+.legend i{width:14px;height:14px;border-radius:3px;display:block;border:1px solid color-mix(in srgb,var(--ink) 12%,transparent)}
+.legend .rng{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.legend .bar{height:8px;background:var(--chip);border-radius:2px;overflow:hidden}
+.legend .bar span{display:block;height:100%;background:var(--muted);opacity:.55}
+.legend .n{font-family:var(--f-mono);color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.legend .nd i{background:var(--nodata)}
+.hint{font-size:12px;color:var(--muted);margin:0}
+
+.search{position:relative}
+.sugg{position:absolute;left:0;right:0;top:100%;margin:4px 0 0;padding:4px;list-style:none;background:var(--panel);border:1px solid var(--rule);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);z-index:5;max-height:260px;overflow:auto}
+.sugg li{padding:7px 8px;border-radius:6px;cursor:pointer;display:flex;justify-content:space-between;gap:8px;font-size:13px}
+.sugg li[aria-selected="true"],.sugg li:hover{background:var(--chip)}
+.sugg small{color:var(--muted);font-family:var(--f-mono);font-size:11px;white-space:nowrap}
+.sugg li span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sugg li span em{font-style:normal;color:var(--muted);font-size:12px}
+.addrline{display:flex;gap:8px;align-items:center;font-size:13px}
+.addrline i{width:10px;height:10px;border-radius:50%;background:var(--warn);border:2px solid var(--panel);box-shadow:0 0 0 1px var(--warn);flex:none}
+
+.profile .title{display:grid;gap:2px}
+.profile .title b{font-family:var(--f-display);font-size:22px;font-weight:600;line-height:1.05;text-wrap:balance}
+.profile .title small{color:var(--muted);font-family:var(--f-mono);font-size:11px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--rule);background:var(--bg);border-radius:99px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.ptable{display:grid;gap:0;font-size:13px}
+.ptable .ph,.ptable button{display:grid;grid-template-columns:minmax(0,1fr) 74px 74px;gap:8px;align-items:center;padding:6px 2px;border:0;border-bottom:1px solid var(--rule);background:none;text-align:left;width:100%;cursor:pointer}
+.ptable.cmp .ph,.ptable.cmp button{grid-template-columns:minmax(0,1fr) 66px 66px 58px}
+.ptable .gh{font-family:var(--f-display);font-size:16px;font-weight:600;padding:14px 2px 2px;border-bottom:1px solid var(--rule)}
+.ptable .ph{cursor:default;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;padding-top:0}
+.ptable button:hover{background:var(--chip)}
+.ptable button[aria-current="true"] .lbl{font-weight:700}
+.ptable .lbl{display:grid;gap:3px;min-width:0}
+.ptable .lbl > span:first-child{text-wrap:pretty}
+.ptable .v{font-family:var(--f-mono);font-size:12px;text-align:right;font-variant-numeric:tabular-nums}
+.ptable .v.city{color:var(--muted)}
+.ptable .v.up{color:var(--brand-green)} .ptable .v.dn{color:var(--warn)}
+.strip{position:relative;height:6px;border-radius:3px;background:linear-gradient(90deg,var(--chip),color-mix(in srgb,var(--muted) 35%,var(--chip)))}
+.strip i{position:absolute;top:-2px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:var(--accent);border:2px solid var(--panel)}
+.strip i.b{background:var(--warn)}
+.strip::after{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;border-left:1px dashed var(--muted);opacity:.6}
+.empty{padding:14px;border:1px dashed var(--rule);border-radius:8px;color:var(--muted);font-size:13px}
+.key{display:flex;gap:14px;font-size:11px;color:var(--muted);flex-wrap:wrap}
+.key span{display:inline-flex;gap:6px;align-items:center}
+.key i{width:9px;height:9px;border-radius:50%;display:inline-block}
+
+.scatter svg{width:100%;height:auto;display:block;overflow:visible}
+.scatter .ax{stroke:var(--rule)} .scatter .tick{fill:var(--muted);font:10px var(--f-mono)}
+.scatter .axl{fill:var(--muted);font:600 11px var(--f-body)}
+.scatter circle{stroke:var(--panel);stroke-width:.8;cursor:pointer}
+.scatter circle.sel{stroke:var(--sel);stroke-width:2.2}
+.scatter circle.dim{opacity:.18}
+.insight{margin:0;padding:10px 12px;background:var(--chip);border-radius:8px;font-size:13px}
+
+.ranks{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.ranks h3{margin:0 0 4px;font-size:12px;font-weight:600}
+.ranks ol{margin:0;padding:0;list-style:none;display:grid;gap:2px}
+.ranks button{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;width:100%;border:0;background:none;padding:4px 4px;border-radius:5px;cursor:pointer;text-align:left;font-size:12px}
+.ranks button:hover{background:var(--chip)}
+.ranks button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ranks button b{font-family:var(--f-mono);font-weight:500;font-variant-numeric:tabular-nums}
+
+footer{padding-block:16px 24px;font-size:11px;color:var(--muted);display:grid;gap:6px}
+footer p{margin:0}
+footer a{color:var(--accent-text)}
+
+.leaflet-container{font-family:var(--f-body);background:var(--land)}
+.north{color:var(--ink);background:var(--halo);border:1px solid var(--rule);border-radius:50%;width:44px;height:44px;display:grid;place-items:center;box-shadow:0 1px 6px rgba(0,0,0,.12)}
+.north svg{display:block}
+.leaflet-tooltip.tip{background:var(--halo);color:var(--ink);border:1px solid var(--rule);box-shadow:0 2px 10px rgba(0,0,0,.15);border-radius:6px;padding:6px 8px;font-size:12px;line-height:1.35}
+.leaflet-tooltip.tip:before{display:none}
+.leaflet-tooltip.tip b{font-weight:600}
+.leaflet-tooltip.tip .tv{font-family:var(--f-mono)}
+.leaflet-bar a{background:var(--panel);color:var(--ink);border-bottom-color:var(--rule)}
+.leaflet-bar a:hover{background:var(--chip)}
+.leaflet-touch .leaflet-bar{border-color:var(--rule)}
+.leaflet-container .leaflet-control-attribution{background:var(--halo);color:var(--muted)}
+.leaflet-container .leaflet-control-attribution a{color:var(--accent-text)}
+.loading{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:13px;z-index:1}
+.mapwrap{position:relative;min-width:0}
+.mapwrap #map{position:absolute;inset:0}
+
+@media (prefers-reduced-motion: reduce){ *{transition:none!important;animation:none!important} }
+
+/* ---------- phone layout ---------- */
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--panel)}
+:root{--tabs:60px;--peek:118px;--top:64px}
+.m-app{position:fixed;inset:env(safe-area-inset-top,0px) 0 0 0}
+.m-app #map{position:absolute;inset:0 0 calc(var(--tabs) + env(safe-area-inset-bottom,0px)) 0;z-index:0}
+.loading{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:13px;z-index:1;padding:24px;text-align:center}
+
+.topbar{position:absolute;left:0;right:0;top:0;z-index:20;padding-block:10px;padding-left:max(12px, env(safe-area-inset-left,0px));padding-right:max(12px, env(safe-area-inset-right,0px));pointer-events:none}
+.topbar .search{pointer-events:auto}
+.topbar input[type=search]{background:var(--panel);box-shadow:0 2px 12px rgba(0,0,0,.16);border-radius:12px;padding:12px 14px 12px 40px;font-size:16px}
+.topbar .sicon{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.topbar .sugg{max-height:55vh}
+.topbar .sugg li{padding:11px 10px}
+.m-app .leaflet-top.leaflet-right{top:calc(var(--top) + 2px)}
+
+.sheet{position:absolute;left:0;right:0;bottom:calc(var(--tabs) + env(safe-area-inset-bottom,0px));z-index:15;background:var(--panel);border-radius:16px 16px 0 0;box-shadow:0 -4px 22px rgba(0,0,0,.16);display:flex;flex-direction:column;height:var(--peek);transition:height .28s cubic-bezier(.2,.8,.2,1);touch-action:pan-y}
+.sheet[data-state="open"]{height:62%}
+.sheet[data-state="full"]{height:calc(100% - var(--tabs) - env(safe-area-inset-bottom,0px) - var(--top))}
+.sheet.dragging{transition:none}
+.grab{flex:none;display:grid;place-items:center;height:22px;border:0;background:none;cursor:grab;touch-action:none;width:100%}
+.grab span{width:40px;height:5px;border-radius:3px;background:var(--rule)}
+.peek{flex:none;padding-left:max(16px, env(safe-area-inset-left,0px));padding-right:max(16px, env(safe-area-inset-right,0px));padding-bottom:10px;display:grid;gap:6px;cursor:pointer;border:0;background:none;text-align:left;width:100%}
+.peek .l1{display:flex;justify-content:space-between;gap:10px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.peek .l1 span:last-child{text-transform:none;letter-spacing:0;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.peek .l2{display:flex;align-items:baseline;gap:10px;min-width:0}
+.peek .l2 b{font-family:var(--f-display);font-size:26px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}
+.peek .l2 span{font-size:13px;color:var(--muted);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ramp{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;height:8px;border-radius:4px;overflow:hidden;position:relative}
+.ramp i{display:block}
+.rampwrap{position:relative;padding-top:2px}
+.rampwrap .mk{position:absolute;top:-3px;width:4px;height:14px;margin-left:-2px;border-radius:2px;background:var(--ink);box-shadow:0 0 0 2px var(--panel)}
+.rampwrap .ends{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:10px;color:var(--muted);margin-top:3px}
+
+.panes{flex:1;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;border-top:1px solid var(--rule)}
+.sheet[data-state="peek"] .panes{visibility:hidden}
+.pane{display:none}
+.pane.on{display:block}
+.pane > section,.pane > header,.pane > footer{padding-left:max(16px, env(safe-area-inset-left,0px));padding-right:max(16px, env(safe-area-inset-right,0px))}
+.pane > section:last-child{border-bottom:0}
+.pane header{padding-block:14px 12px}
+.pane h1{font-size:26px}
+
+.tabs{position:absolute;left:0;right:0;bottom:0;z-index:25;display:grid;grid-template-columns:repeat(4,1fr);height:calc(var(--tabs) + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);background:var(--panel);border-top:1px solid var(--rule)}
+.tabs button{border:0;background:none;display:grid;justify-items:center;align-content:center;gap:3px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;padding:0}
+.tabs button svg{width:22px;height:22px}
+.tabs button[aria-selected="true"]{color:var(--accent-text)}
+.legend button{padding:9px 4px}
+.ptable button{padding:9px 2px}
+.ranks{grid-template-columns:1fr}
+.ranks button{padding:8px 4px;font-size:13px}
+.seg button{padding:10px 4px}
+.btn{padding:8px 14px;font-size:13px}
+.switch{font-size:12px}
+@media (min-width: 620px){ .sheet{left:12px;right:auto;width:420px;border-radius:16px 16px 0 0} }
+</style>
+
+<div class="m-app">
+  <div id="map" role="application" aria-label="Map of Guelph neighbourhoods"></div>
+  <div class="loading" id="loading">Loading 2021 Census neighbourhoods…</div>
+
+  <div class="topbar">
+    <div class="search">
+      <svg class="sicon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+      <input type="search" id="q" placeholder="Search an address or street" autocomplete="off" enterkeyhint="search" aria-label="Find a Guelph address or street" role="combobox" aria-expanded="false" aria-controls="sugg">
+      <ul class="sugg" id="sugg" role="listbox" hidden></ul>
+    </div>
+  </div>
+
+  <section class="sheet" id="sheet" data-state="peek" aria-label="Census panel">
+    <button class="grab" id="grab" aria-label="Expand panel" aria-expanded="false"><span></span></button>
+    <button class="peek" id="peek" aria-label="Open neighbourhood profile"></button>
+    <div class="panes" id="panes">
+      <div class="pane on" data-pane="measure">
+        <header>
+          <div class="eyebrow"><span>Guelph · 2021 Census · Police calls 2021–25</span><span id="addrNote"></span></div>
+          <h1>Census and Crime Explorer</h1>
+          <p id="sub">Guelph's neighbourhoods by the numbers, with crime and what it means for wellbeing.</p>
+        </header>
+        <section aria-labelledby="hMap">
+          <h2 id="hMap">Map a measure</h2>
+          <label class="field" for="measure">Measure<select id="measure"></select></label>
+          <div class="row2">
+            <label class="field">Breaks
+              <div class="seg" id="method" role="group" aria-label="Classification method">
+                <button data-m="jenks" aria-pressed="true" title="Natural breaks (Jenks)">Natural</button>
+                <button data-m="quantile" aria-pressed="false">Quantile</button>
+                <button data-m="equal" aria-pressed="false" title="Equal interval">Equal</button>
+              </div>
+            </label>
+            <label class="field">Classes
+              <div class="seg" id="classes" role="group" aria-label="Number of classes">
+                <button data-k="4" aria-pressed="false">4</button><button data-k="5" aria-pressed="true">5</button><button data-k="6" aria-pressed="false">6</button><button data-k="7" aria-pressed="false">7</button>
+              </div>
+            </label>
+          </div>
+          <div class="measureHead"><b id="mLabel"></b><small id="mDesc"></small></div>
+          <div class="cityfig" id="cityfig"></div>
+          <div class="legend" id="legend"></div>
+          <p class="hint">Tap a class to pick out its neighbourhoods. Tap the map to choose a neighbourhood.</p>
+        </section>
+      </div>
+      <div class="pane profile" data-pane="place">
+        <section aria-labelledby="hProf">
+          <h2 id="hProf">Neighbourhood profile <em id="profNote"></em></h2>
+          <div id="profile"></div>
+        </section>
+      </div>
+      <div class="pane scatter" data-pane="relate">
+        <section aria-labelledby="hRel">
+          <h2 id="hRel">How two measures relate</h2>
+          <label class="field" for="ymeasure">Compare the mapped measure with<select id="ymeasure"></select></label>
+          <div id="scatter"></div>
+          <p class="insight" id="rnote"></p>
+        </section>
+      </div>
+      <div class="pane" data-pane="rank">
+        <section aria-labelledby="hRank">
+          <h2 id="hRank">Highest and lowest <em id="rankNote"></em></h2>
+          <div class="ranks" id="ranks"></div>
+        </section>
+        <footer>
+          <p>Neighbourhoods are Statistics Canada dissemination areas (DAs), each home to roughly 400 to 700 people. Each is named after the two streets with the most length inside it. Values marked n/a were suppressed by Statistics Canada to protect privacy.</p>
+          <p>Incomes are for the 2020 calendar year, when pandemic benefits raised some low incomes. City figures are Statistics Canada's own figures for the City of Guelph. Most measures past population and age come from the 25% long-form sample, so small neighbourhoods can swing a lot. Work figures describe May 2021, during the pandemic.</p>
+          <p>Data: Statistics Canada, 2021 Census of Population (Statistics Canada Open Licence). Crime: Guelph Police Service calls for service, 2021–2025. Map, addresses and city boundary: City of Guelph Open Data. The 15-minute score comes from <a href="https://randyharris1999-cloud.github.io/15-Minute-Guelph/" target="_blank" rel="noopener">15-Minute Guelph</a>. An independent project, not an official City of Guelph service. Created by Randy Harris.</p>
+      <p>Crime figures come from Guelph Police Service calls for service, 2021 to 2025 (about 400,000 calls). The app keeps 51,909 calls about place-based incidents in five groups: violence and threats; break-ins and vehicle theft; theft and vandalism; disturbances and disorder; and collisions and driving complaints. It leaves out administrative records, 911 hang-ups, traffic stops and other police-initiated work, wellness and mental-health calls, domestic calls, missing persons, fraud and sex offences, because they are not tied to a place or would be unfair to map. Calls give a street but no house number, so each street's calls are spread along it (half by length, half by the number of addresses on each block). Each home gets the calls a year on streets within 400 m, a 5-minute walk; a neighbourhood's figure is the average of its homes. Vehicle-theft calls logged at Guelph Police headquarters (15 Wyndham St S) are dropped. Calls are not convictions, and long arterial roads blur where along them a call happened.</p><p>Why it matters for wellbeing: crime and the fear of it affect health beyond the harm to victims, discouraging walking and outdoor activity and weakening ties between neighbours (<a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3666893/" target="_blank" rel="noopener">Lorenc et al., 2013</a>; <a href="https://www150.statcan.gc.ca/n1/pub/85-002-x/2011001/article/11577-eng.htm" target="_blank" rel="noopener">Statistics Canada, perceptions of personal safety</a>). Links between crime and census measures in the Relate chart describe places, not people, and do not show that one causes the other.</p>
+          <p class="switch"><a href="index.html" id="toDesktop">Switch to the desktop version</a></p>
+        </footer>
+      </div>
+    </div>
+  </section>
+
+  <nav class="tabs" role="tablist" aria-label="Panels">
+    <button role="tab" data-tab="measure" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg>Measure</button>
+    <button role="tab" data-tab="place" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>Profile</button>
+    <button role="tab" data-tab="relate" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 4v16h16"/><circle cx="9" cy="14" r="1.4" fill="currentColor"/><circle cx="13" cy="11" r="1.4" fill="currentColor"/><circle cx="17" cy="7" r="1.4" fill="currentColor"/><circle cx="12" cy="15.5" r="1.4" fill="currentColor"/></svg>Relate</button>
+    <button role="tab" data-tab="rank" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M5 6h14M5 12h10M5 18h6"/></svg>Rankings</button>
+  </nav>
+</div>
+
+<script>
+/* Phone layout glue. The shared app code (below) calls these hooks. */
+(function () {
+  const sheet = () => document.getElementById("sheet");
+  let tab = "measure";
+  function setState(st) {
+    const el = sheet(); el.dataset.state = st;
+    document.getElementById("grab").setAttribute("aria-expanded", st !== "peek");
+  }
+  function setTab(t, open) {
+    tab = t;
+    document.querySelectorAll(".pane").forEach(p => p.classList.toggle("on", p.dataset.pane === t));
+    document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === t));
+    document.getElementById("panes").scrollTop = 0;
+    if (open) setState(sheet().dataset.state === "full" ? "full" : "open");
+  }
+  function peekHeight() { return document.getElementById("sheet").getBoundingClientRect().height; }
+  window.UI = {
+    touch: true,
+    pad(n = 36) { const top = document.querySelector(".topbar").getBoundingClientRect().height; return {paddingTopLeft:[n * 0.6, top + n * 0.4], paddingBottomRight:[n * 0.6, 118 + n * 0.6]}; },
+    update() {
+      if (typeof S === "undefined" || !D || !S.br) return;
+      const M = MEASURES[S.measure], a = S.sel, v = a ? a[S.measure] : null;
+      const lo = S.br[0], hi = S.br[S.br.length - 1];
+      const pos = v == null || hi === lo ? null : Math.max(0, Math.min(100, 100 * (v - lo) / (hi - lo)));
+      const city = M.city()[0];
+      let rankTxt = "";
+      if (v != null) { const r = pctRank(S.measure, v); rankTxt = `higher than ${Math.round(r)}% of neighbourhoods`; }
+      document.getElementById("peek").innerHTML =
+        `<div class="l1"><span>${esc(M.label)}</span><span>${a ? esc(a.name) : "Tap the map"}</span></div>
+         <div class="l2"><b>${v == null ? (a ? "n/a" : city) : M.long(v)}</b><span>${a ? (v == null ? "Not reported here" : rankTxt) : "City of Guelph"} · Guelph ${city}</span></div>
+         <div class="rampwrap"><div class="ramp">${S.cols.map(c => `<i style="background:${c}"></i>`).join("")}</div>${pos != null ? `<span class="mk" style="left:${pos}%"></span>` : ""}<div class="ends"><span>${M.fmt(lo)}</span><span>${M.fmt(hi)}</span></div></div>`;
+    },
+    onSelect(a, o) { setState("peek"); },
+    onAddress() { setState("peek"); document.getElementById("q").blur(); },
+    onReady() {
+      document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+        if (b.dataset.tab === tab && sheet().dataset.state !== "peek") { setState("peek"); return; }
+        setTab(b.dataset.tab, true);
+      });
+      document.getElementById("peek").onclick = () => setTab(S.sel ? "place" : "measure", true);
+      // drag the handle (or tap it) to move between peek, open and full
+      const g = document.getElementById("grab"); let y0 = null, h0 = 0, moved = false;
+      g.addEventListener("pointerdown", e => { y0 = e.clientY; h0 = sheet().getBoundingClientRect().height; moved = false; sheet().classList.add("dragging"); g.setPointerCapture(e.pointerId); });
+      g.addEventListener("pointermove", e => { if (y0 == null) return; const dy = y0 - e.clientY; if (Math.abs(dy) > 6) moved = true; sheet().style.height = Math.max(90, h0 + dy) + "px"; });
+      const end = e => { if (y0 == null) return; const el = sheet(); el.classList.remove("dragging"); const h = el.getBoundingClientRect().height; el.style.height = "";
+        const H = el.parentElement.getBoundingClientRect().height;
+        if (!moved) setState(el.dataset.state === "peek" ? "open" : "peek");
+        else setState(h < H * 0.3 ? "peek" : h < H * 0.72 ? "open" : "full");
+        y0 = null; };
+      g.addEventListener("pointerup", end); g.addEventListener("pointercancel", end);
+      document.getElementById("q").addEventListener("focus", () => setState("peek"));
+      const t = document.getElementById("toDesktop");
+      t.onclick = () => { try { localStorage.setItem("gce-view", "desktop"); } catch (e) {} };
+      this.update();
+    },
+  };
+})();
+</script>
+<script src="leaflet.min.js"></script>
+<script>/*APP_JS*/</script>
